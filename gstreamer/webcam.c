@@ -43,10 +43,12 @@ gboolean timeout_callback(gpointer d)
 {
 	printf("timeout_callback called\n");
 
+	  GstElement *pipeline =d;
+	
 		 if (!data.seek_enabled) {
                   GstSample *sample = NULL;
                   GstCaps *caps;
-				  GstElement *pipeline =d;
+				
                   
                   GST_DEBUG ("taking snapshot");
                   caps = gst_caps_new_simple ("video/x-raw", "format", G_TYPE_STRING, "RGB",
