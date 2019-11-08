@@ -15,6 +15,9 @@
 #include <gst/video/colorbalance.h>
 #include <gst/video/navigation.h>
 
+GST_DEBUG_CATEGORY_STATIC (debug_category);
+#define GST_CAT_DEFAULT debug_category
+
 typedef struct _CustomData
 {
 	GstElement *pipeline;
@@ -43,6 +46,7 @@ gboolean timeout_callback(gpointer d)
 		 if (!data.seek_enabled) {
                   GstSample *sample = NULL;
                   GstCaps *caps;
+				  GstElement *pipeline =d;
                   
                   GST_DEBUG ("taking snapshot");
                   caps = gst_caps_new_simple ("video/x-raw", "format", G_TYPE_STRING, "RGB",
@@ -52,10 +56,9 @@ gboolean timeout_callback(gpointer d)
                      "pixel-aspect-ratio", GST_TYPE_FRACTION, 1, 1, NULL);
 
 				  //tqtqtq
-                  g_signal_emit_by_name (GST_BIN(data.pipeline), "convert-sample", caps, &sample);
+                  g_signal_emit_by_name (GST_BIN(pipeline), "convert-sample", caps, &sample);
                   gst_caps_unref (caps);
-
-
+			
                   if (sample) {
                      GstBuffer *buffer;
                      GstCaps *caps;
@@ -168,7 +171,10 @@ int main(int argc, char *argv[]){
 	data.duration = GST_CLOCK_TIME_NONE;
 
 	/* Initialize GStreamer */
+	//gst_debug_set_threshold_from_string ("*:4",TRUE);
+	 _putenv_s ("GST_DEBUG","*:4");
 	gst_init (&argc, &argv);
+
 
 	/* Create the elements */
 	data.source = gst_element_factory_make ("ksvideosrc", "source");
@@ -203,7 +209,7 @@ int main(int argc, char *argv[]){
 	}
 
 	filtercaps = gst_caps_new_simple ("image/jpeg",
-               "width", G_TYPE_INT, 1280,//≥ªª˝∞¢ø£ «ÿªÛµµ∞∞¿Ω
+               "width", G_TYPE_INT, 1280,//ÎÇ¥ÏÉùÍ∞ÅÏóî Ìï¥ÏÉÅÎèÑÍ∞ôÏùå
                "height", G_TYPE_INT, 720,
                NULL);
   g_object_set (G_OBJECT (data.filter), "caps", filtercaps, NULL);
@@ -211,7 +217,7 @@ int main(int argc, char *argv[]){
 
   
 	/* Set the URI to play */
-	g_object_set (data.source, "device-index",0,NULL);//¿•ƒ∑ø¨∞·Ω√ 1
+	g_object_set (data.source, "device-index",0,NULL);//ÏõπÏ∫†Ïó∞Í≤∞Ïãú 1
 
 
 
@@ -228,7 +234,8 @@ int main(int argc, char *argv[]){
 	bus_watch_id = gst_bus_add_watch (bus, my_bus_callback, NULL);
 
 	//create timeout source
-	g_timeout_add(3000, timeout_callback,NULL);
+	g_timeout_add(3000, timeout_callback,data.pipeline);
+
 
 	//create main loop
 
