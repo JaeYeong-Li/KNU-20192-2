@@ -1,5 +1,5 @@
 #include <gst/gst.h>
-#include <string.h>//gst-launch-1.0 ksvideosrc ! image/jpeg, weigt= , height= , ! jpegdec ! videoconvert ! videorate ! video/x-raw, framerate=1/3 ! autovideosink
+#include <string.h>//gst-launch-1.0 ksvideosrc ! image/jpeg, weigt= , height= , ! jpegdec ! videoconvert ! videorate ! video/x-raw, framerate=1/3 ! pngenc ! multifilesink location="frame-%d.png" 
 #ifdef HAVE_CONFIG_H//3초마다 캡처한 화면이 안나와서 이게 잘 되고 있는건지 모르겠음;;
 #include "config.h"
 #endif
@@ -22,12 +22,14 @@ typedef struct _CustomData
 {
 	GstElement *pipeline;
 	GstElement *source;//ksvideosrc
-	GstElement *sink;//autovideosink
+	GstElement *sink;//autovideosink->multifilesink
 	GstElement *convert;//vieoconvert
 	GstElement *filter;//image/jpg
 	GstElement *jpegdec;
 	GstElement *rate;//videorate
 	GstElement *framerate;//video/x-raw
+	GstElement *pngenc;
+
 	GstElement *playbin;          /* Our one and only element */
 	gboolean playing;             /* Are we in the PLAYING state? */
 	gboolean terminate;           /* Should we terminate execution? */
@@ -39,6 +41,7 @@ typedef struct _CustomData
 
 CustomData data;
 int idx;
+int count;
 static GMainLoop *loop;
 
 static gboolean
@@ -104,31 +107,33 @@ int main(int argc, char *argv[]){
 	/* Create the elements */
 	data.source = gst_element_factory_make ("ksvideosrc", "source");
 	data.convert=gst_element_factory_make("autovideoconvert","convert");
-	data.sink=gst_element_factory_make("autovideosink","sink");
+	//data.sink=gst_element_factory_make("autovideosink","sink");
 	data.filter = gst_element_factory_make ("capsfilter", "filter");
 	data.jpegdec=gst_element_factory_make("jpegdec","dec");
 	data.rate=gst_element_factory_make("videorate","rate");
 	data.framerate=gst_element_factory_make("appsrc","framerate");
-
+	data.sink=gst_element_factory_make("multifilesink","sink");
+	data.pngenc=gst_element_factory_make("pngenc","pngenc");
 
   /* Create the empty pipeline */
 	data.pipeline = gst_pipeline_new ("pipeline");
+	//data.pipeline=gst_bin_new("bin");
 	data.pipeline = gst_parse_launch("pipeline",NULL);
 
-  if (!data.pipeline || !data.source || !data.convert || !data.sink || !data.jpegdec || !data.filter || !data.rate || !data.framerate) {
+  if (!data.pipeline || !data.source || !data.convert || !data.sink || !data.jpegdec || !data.filter || !data.rate || !data.framerate ||!data.pngenc) {
     g_printerr ("Not all elements could be created.\n");
     return -1;
   }
 
 
-	gst_bin_add_many(GST_BIN(data.pipeline),data.source,data.filter,data.jpegdec,data.convert,data.rate,data.framerate,data.sink,NULL);
+	gst_bin_add_many(GST_BIN(data.pipeline),data.source,data.filter,data.jpegdec,data.convert,data.rate,data.framerate,data.pngenc,data.sink,NULL);
 	 if (!gst_element_link (data.convert, data.sink)) {
     g_printerr ("Elements could not be linked.\n");
     gst_object_unref (data.pipeline);
     return -1;
   }
 
-	if(gst_element_link_many(data.source,data.filter,data.jpegdec,data.convert,data.rate,data.framerate,data.sink,NULL)){
+	if(gst_element_link_many(data.source,data.filter,data.jpegdec,data.convert,data.rate,data.framerate,data.pngenc,data.sink,NULL)){
 			g_printerr ("Elements could not be linked.\n");
 		gst_object_unref (data.pipeline);
 		return -1;
@@ -144,8 +149,10 @@ int main(int argc, char *argv[]){
 
    g_object_set (G_OBJECT (data.framerate), "caps",
         gst_caps_new_simple ("video/x-raw",
-                     "framerate", GST_TYPE_FRACTION, 25, 1,
+                     "framerate", GST_TYPE_FRACTION, 3, 1,//이부분모르겠음 3분의 1로 어떻게함?
                      NULL), NULL);
+
+   g_object_set(data.sink,"location","frame-%d.png",count++,NULL);//어떻게 저장함?
 
 	/* Set the URI to play */
 	g_object_set (data.source, "device-index",0,NULL);//웹캠연결시 1
