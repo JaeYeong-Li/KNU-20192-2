@@ -1,6 +1,6 @@
 #include <gst/gst.h>
 #include <string.h>//gst-launch-1.0 ksvideosrc ! image/jpeg, weigt= , height= , ! jpegdec ! videoconvert ! videorate ! video/x-raw, framerate=1/3 ! pngenc ! multifilesink location="frame-%d.png" 
-#ifdef HAVE_CONFIG_H//3초마다 캡처한 화면이 안나와서 이게 잘 되고 있는건지 모르겠음;;
+#ifdef HAVE_CONFIG_H
 #include "config.h"
 #endif
 
