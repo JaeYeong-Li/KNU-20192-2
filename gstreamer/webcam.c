@@ -1,5 +1,5 @@
 #include <gst/gst.h>
-#include <string.h>//gst-launch-1.0 ksvideosrc ! image/jpeg, weigt= , height= , ! jpegdec ! videoconvert ! autovideosink
+#include <string.h>
 #ifdef HAVE_CONFIG_H
 #include "config.h"
 #endif
@@ -15,17 +15,8 @@
 #include <gst/video/colorbalance.h>
 #include <gst/video/navigation.h>
 
-GST_DEBUG_CATEGORY_STATIC (debug_category);
-#define GST_CAT_DEFAULT debug_category
-
 typedef struct _CustomData
 {
-	GstElement *pipeline;
-	GstElement *source;
-	GstElement *sink;
-	GstElement *convert;
-	GstElement *filter;
-	GstElement *dec;
 	GstElement *playbin;          /* Our one and only element */
 	gboolean playing;             /* Are we in the PLAYING state? */
 	gboolean terminate;           /* Should we terminate execution? */
@@ -43,12 +34,9 @@ gboolean timeout_callback(gpointer d)
 {
 	printf("timeout_callback called\n");
 
-	  GstElement *pipeline =d;
-	
 		 if (!data.seek_enabled) {
                   GstSample *sample = NULL;
                   GstCaps *caps;
-				
                   
                   GST_DEBUG ("taking snapshot");
                   caps = gst_caps_new_simple ("video/x-raw", "format", G_TYPE_STRING, "RGB",
@@ -57,10 +45,10 @@ gboolean timeout_callback(gpointer d)
                      * ratio to a 1/1 pixel-aspect-ratio */
                      "pixel-aspect-ratio", GST_TYPE_FRACTION, 1, 1, NULL);
 
-				  //tqtqtq
-                  g_signal_emit_by_name (GST_BIN(pipeline), "convert-sample", caps, &sample);
+                  g_signal_emit_by_name (data.playbin, "convert-sample", caps, &sample);
                   gst_caps_unref (caps);
-			
+
+
                   if (sample) {
                      GstBuffer *buffer;
                      GstCaps *caps;
@@ -129,7 +117,7 @@ static gboolean
 		gchar *debug;
 
 		gst_message_parse_error (message, &err, &debug);
-		g_print ("%s\n", err->message);
+		g_print ("Error: %s\n", err->message);
 		g_error_free (err);
 		g_free (debug);
 
@@ -155,6 +143,7 @@ int main(int argc, char *argv[]){
 
 	// GMainLoop * loop = NULL;
 
+	GstMessage *msg;
 	GstBus *bus;
 	GstStateChangeReturn ret;
 
@@ -162,9 +151,9 @@ int main(int argc, char *argv[]){
 
 	GSource * source = NULL;
 
-	GstCaps *filtercaps;
-
 	guint bus_watch_id;
+
+	int id;
 
 	data.playing = FALSE;
 	data.terminate = FALSE;
@@ -173,82 +162,59 @@ int main(int argc, char *argv[]){
 	data.duration = GST_CLOCK_TIME_NONE;
 
 	/* Initialize GStreamer */
-	//gst_debug_set_threshold_from_string ("*:4",TRUE);
-	 _putenv_s ("GST_DEBUG","*:4");
 	gst_init (&argc, &argv);
-
-
 	/* Create the elements */
-	data.source = gst_element_factory_make ("ksvideosrc", "source");
-	data.convert=gst_element_factory_make("autovideoconvert","convert");
-	data.sink=gst_element_factory_make("autovideosink","sink");
-	data.filter = gst_element_factory_make ("capsfilter", "filter");
-	data.dec=gst_element_factory_make("jpegdec","dec");
+	data.playbin = gst_element_factory_make ("playbin", "playbin");
 
-
-  /* Create the empty pipeline */
-	data.pipeline = gst_pipeline_new ("pipeline");
-	//data.pipeline=gst_bin_new("bin");
-	data.pipeline = gst_parse_launch("pipeline",NULL);
-
-  if (!data.pipeline || !data.source || !data.convert || !data.sink || !data.dec || !data.filter) {
-    g_printerr ("Not all elements could be created.\n");
-    return -1;
-  }
-
-
-	gst_bin_add_many(GST_BIN(data.pipeline),data.source,data.filter,data.dec,data.convert,data.sink,NULL);
-	 if (!gst_element_link (data.convert, data.sink)) {
-    g_printerr ("Elements could not be linked.\n");
-    gst_object_unref (data.pipeline);
-    return -1;
-  }
-
-	if(gst_element_link_many(data.source,data.filter,data.dec,data.convert,data.sink,NULL)){
-			g_printerr ("Elements could not be linked.\n");
-		gst_object_unref (data.pipeline);
+	if (!data.playbin) {
+		g_printerr ("Not all elements could be created.\n");
 		return -1;
 	}
 
-	filtercaps = gst_caps_new_simple ("image/jpeg",
-               "width", G_TYPE_INT, 1280,//내생각엔 해상도같음
-               "height", G_TYPE_INT, 720,
-               NULL);
-  g_object_set (G_OBJECT (data.filter), "caps", filtercaps, NULL);
-  gst_caps_unref (filtercaps);
-
-  
 	/* Set the URI to play */
-	g_object_set (data.source, "device-index",0,NULL);//웹캠연결시 1
-
-
+	g_object_set (data.playbin, "uri","file:///D:/test.mp4",NULL);
 
 	/* Start playing */
-  ret = gst_element_set_state (data.pipeline, GST_STATE_PLAYING);
+  ret = gst_element_set_state (data.playbin, GST_STATE_PLAYING);
   if (ret == GST_STATE_CHANGE_FAILURE) {
     g_printerr ("Unable to set the pipeline to the playing state.\n");
-    gst_object_unref (data.pipeline);
+    gst_object_unref (data.playbin);
     return -1;
   }
 
+
 	/* Listen to the bus */
-	bus = gst_element_get_bus (data.pipeline);
+	bus = gst_element_get_bus (data.playbin);
 	bus_watch_id = gst_bus_add_watch (bus, my_bus_callback, NULL);
 
 	//create timeout source
-	g_timeout_add(3000, timeout_callback,data.pipeline);
+	g_timeout_add(3000, timeout_callback,NULL);
 
+	//source = g_timeout_source_new_seconds(3);
+
+	//create a context
+
+	//context = g_main_context_new();
+
+	//attach source to context
+
+	//id = g_source_attach(source, context);//if context is NULL, the default context will be used.
 
 	//create main loop
 
 	loop = g_main_loop_new(context, FALSE);
 
+	//set the callback for this source
+
+	//g_source_set_callback(source, timeout_callback, loop, NULL);
+
+
 	g_main_loop_run(loop);
 
 	/* Free resources */
 	gst_object_unref (bus);
-	gst_element_set_state (data.pipeline, GST_STATE_NULL);
-	gst_object_unref (data.pipeline);
+	gst_element_set_state (data.playbin, GST_STATE_NULL);
+	gst_object_unref (data.playbin);
 	g_main_loop_unref(loop);
 	return 0;
 
